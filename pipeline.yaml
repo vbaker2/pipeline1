@@ -1,0 +1,95 @@
+pipeline {
+
+    agent any
+    
+    stages {
+    
+        stage("is AAGM alive?") {
+        
+            steps {
+				script {
+				echo '------------------------------------------------'
+				echo '---------------  is AAGM alive?  ---------------'
+				echo '------------------------------------------------'
+				
+					def response = httpRequest "http://aagm.demo.apiida.link/api/v1/alive"
+					println('Response: '+response.content)
+				}
+            }
+        }
+
+        stage("Mask ssg test cluster from Load Balancer") {
+        
+            steps {
+				script {
+				echo '------------------------------------------------'
+				echo '---------------  Mask node from LB!  ---------------'
+				echo '------------------------------------------------'
+					sleep 3
+				}
+            }
+        }
+    
+        stage("is AAGM ready?") {
+        
+            steps {
+				script {
+				echo '------------------------------------------------'
+				echo '---------------  is AAGM ready?  ---------------'
+				echo '------------------------------------------------'
+				
+					def response = httpRequest "http://aagm.demo.apiida.link/api/v1/ready"
+					println('Response: '+response.content)
+				}
+            }
+        }
+    
+        stage("Login and Deploy") {
+        
+            steps {
+				script {
+				echo '------------------------------------------'
+				echo '---------------  Login...  ---------------'
+				echo '------------------------------------------'
+				
+					def response = httpRequest "http://aagm.demo.apiida.link/api/v1/login?user=aagmadmin@apiida.com&pass=aagmPass2022"
+					println('Response Content: '+response.content)
+
+                    echo '-------------------------------------------'
+                    echo '---------------  Deploy...  ---------------'
+                    echo '-------------------------------------------'
+
+                    def jsonObj = readJSON text: response.content
+                    echo 'Token: '+jsonObj.token 
+				
+				    def body = '{"source": {"type": "git"},"targets": ["ssg prod"],"comment": "Test Migration over API"}'
+					
+					def migResponse = httpRequest customHeaders:[[name:'X-Token', value:"${jsonObj.token}"]] ,contentType: 'APPLICATION_JSON', httpMode: 'POST', requestBody: "${body}" , url: "http://aagm.demo.apiida.link/api/v1/apis/285/migrate"
+					println('Response: '+migResponse.content)
+				}
+			}
+		}
+		stage("Perform Automated Testing") {
+        
+            steps {
+				script {
+				echo '------------------------------------------------'
+				echo '---------------  Automated tests  ---------------'
+				echo '------------------------------------------------'
+					sleep 5
+				}
+			}
+		}
+		stage("Unmask node from LB") {
+        
+            steps {
+				script {
+				echo '------------------------------------------------'
+				echo '---------------  Unmask node  ---------------'
+				echo '------------------------------------------------'
+					sleep 3
+				}
+            }
+		}   
+    }
+}
